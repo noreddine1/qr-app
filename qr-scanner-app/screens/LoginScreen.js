@@ -1,17 +1,61 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+import { auth } from '../firebase/config';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 
-const LoginScreen = () => {
+const LoginScreen = ({ nvigation }) => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const handleToggleMode = () => {
-    setIsSignUp(!isSignUp);
+  const handleAuthenticate = async () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!email || !password) {
+      return Alert.alert('Error', 'Email and password are required.');
+    }
+
+    if (!emailRegex.test(email)) {
+      return Alert.alert('Error', 'Please enter a valid email address.');
+    }
+
+    if (password.length < 6) {
+      return Alert.alert('Error', 'Password must be at least 6 characters.');
+    }
+    if (isSignUp && password !== confirmPassword) {
+      return Alert.alert('Error', 'Passwords do not match.');
+    }
+    // authentication logic 
+    if (isSignUp) {
+      try {
+        await createUserWithEmailAndPassword(auth, email, password);
+        navigation.navigate('Home');
+      } catch (error) {
+        return Alert.alert('Error', error.message);
+      }
+      Alert.alert('Success', 'You have successfully signed up!');
+    } else {
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        navigation.navigate('Home');
+      } catch (error) {
+        return Alert.alert('Error', error.message);
+      }
+      Alert.alert('Success', 'You have successfully logged in!');
+    }
+    resetForm();
+  };
+
+  const resetForm = () => {
     setEmail('');
     setPassword('');
     setConfirmPassword('');
+  };
+
+  const handleToggleMode = () => {
+    setIsSignUp(!isSignUp);
+    resetForm();
   };
 
   return (
@@ -47,7 +91,9 @@ const LoginScreen = () => {
       <View style={styles.buttonContainer}>
         <Button
           title={isSignUp ? 'Sign Up' : 'Login'}
-          onPress={() => Alert.alert(isSignUp ? 'Sign Up' : 'Login', 'Functionality to be implemented')}
+          onPress={() => {
+            handleAuthenticate();
+          }}
           color="#007AFF"
         />
       </View>
