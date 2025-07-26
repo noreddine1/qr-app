@@ -3,11 +3,13 @@ import { View, Text, TextInput, Button, StyleSheet, Alert, TouchableOpacity } fr
 import { auth } from '../firebase/config';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 
-const LoginScreen = ({ nvigation }) => {
+const LoginScreen = ({ navigation }) => {
+  const isDev = __DEV__; // Expo sets this to true in dev mode
+
+  const [email, setEmail] = useState(isDev ? 'test@example.com' : '');
+  const [password, setPassword] = useState(isDev ? '123456' : '');
+  const [confirmPassword, setConfirmPassword] = useState(isDev ? '123456' : '');
   const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
 
   const handleAuthenticate = async () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -55,7 +57,9 @@ const LoginScreen = ({ nvigation }) => {
 
   const handleToggleMode = () => {
     setIsSignUp(!isSignUp);
-    resetForm();
+    if (isDev) { //just for development convenience
+      resetForm();
+    }
   };
 
   return (
