@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert, TextInput, TouchableOpacity } from 'react-native';
 import { auth, db } from '../firebase/config';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
-import { format } from 'date-fns'; // For formatting timestamps
+import { format } from 'date-fns';
 
-const HistoryScreen = () => {
+const HistoryScreen = ({ navigation }) => {
   const [scans, setScans] = useState([]);
+  const [filteredScans, setFilteredScans] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const fetchScans = async () => {
@@ -29,8 +31,8 @@ const HistoryScreen = () => {
           ...doc.data(),
         }));
         setScans(scanData);
+        setFilteredScans(scanData);
       } catch (error) {
-        console.log(error)
         Alert.alert('Error', `Failed to fetch scan history: ${error.message}`);
       } finally {
         setLoading(false);
@@ -40,14 +42,24 @@ const HistoryScreen = () => {
     fetchScans();
   }, []);
 
+  useEffect(() => {
+    const filtered = scans.filter((scan) =>
+      scan.data.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    setFilteredScans(filtered);
+  }, [searchQuery, scans]);
+
   const renderScanItem = ({ item }) => (
-    <View style={styles.scanItem}>
+    <TouchableOpacity
+      onPress={() => navigation.navigate('ScanDetail', { scanId: item.id })}
+      style={styles.scanItem}
+    >
       <Text style={styles.scanData}>{item.data}</Text>
       <Text style={styles.scanMeta}>
         Scanned on: {item.scannedAt ? format(item.scannedAt.toDate(), 'PPp') : 'Unknown'}
       </Text>
       <Text style={styles.scanMeta}>Type: {item.type}</Text>
-    </View>
+    </TouchableOpacity>
   );
 
   if (loading) {
@@ -62,13 +74,22 @@ const HistoryScreen = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Scan History</Text>
-      {scans.length === 0 ? (
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search scans..."
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        autoCapitalize="none"
+      />
+      {filteredScans.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.emptyText}>No scans found.</Text>
+          <Text style={styles.emptyText}>
+            {searchQuery ? 'No matching scans found.' : 'No scans found.'}
+          </Text>
         </View>
       ) : (
         <FlatList
-          data={scans}
+          data={filteredScans}
           keyExtractor={(item) => item.id}
           renderItem={renderScanItem}
           contentContainerStyle={styles.list}
@@ -94,6 +115,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+  },
+  searchInput: {
+    width: '100%',
+    padding: 10,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    backgroundColor: '#fff',
   },
   scanItem: {
     backgroundColor: '#fff',
