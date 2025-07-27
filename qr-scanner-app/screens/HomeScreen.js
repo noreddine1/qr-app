@@ -7,6 +7,11 @@ export default function ({ navigation }) {
             <Text>Home Screen</Text>
             <Button title="Scan QR Code" onPress={() => navigation.navigate('Scanner')} />
             <Button title="Log Out" onPress={() => navigation.navigate("Login")} />
+            <Button
+                title="View Scan History"
+                onPress={() => navigation.navigate('History')}
+                color="#007AFF"
+            />
         </View>
     )
 }
