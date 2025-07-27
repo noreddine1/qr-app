@@ -1,7 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Alert, Button, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Alert } from 'react-native';
 import { CameraView, Camera } from 'expo-camera';
-import { Ionicons } from '@expo/vector-icons';
+import { auth, db } from '../firebase/config';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+
+const saveScanToFirestore = async (data, type) => {
+  const user = auth.currentUser;
+  if (!user) {
+    Alert.alert('Error', 'You must be logged in to scan QR codes.');
+    return;
+  }
+  if (user) {
+    await addDoc(collection(db, 'scans'), {
+      email: user.email,
+      data,
+      type,
+      scannedAt: serverTimestamp(),
+    });
+  }
+}
 
 const ScannerScreen = ({ navigation }) => {
   const [hasPermission, setHasPermission] = useState(null);
@@ -16,10 +33,17 @@ const ScannerScreen = ({ navigation }) => {
     })();
   }, []);
 
-  const handleBarCodeScanned = ({ type, data }) => {
+  const handleBarCodeScanned = async ({ type, data }) => {
     if (scanned) return;
 
     setScanned(true);
+
+    // Save to Firestore
+    try {
+      await saveScanToFirestore(data, type);
+    } catch (error) {
+      Alert.alert('Error', error.message);
+    }
     Alert.alert('QR Code Scanned', data, [
       {
         text: 'Scan Again',
