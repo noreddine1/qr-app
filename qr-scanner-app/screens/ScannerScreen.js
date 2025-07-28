@@ -1,29 +1,29 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { CameraView, Camera } from 'expo-camera';
+import { useFocusEffect } from '@react-navigation/native';
 import { auth, db } from '../firebase/config';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const saveScanToFirestore = async (data, type) => {
   const user = auth.currentUser;
   if (!user) {
-    Alert.alert('Error', 'You must be logged in to scan QR codes.');
-    return;
+    throw new Error('You must be logged in to scan QR codes.');
   }
-  if (user) {
-    await addDoc(collection(db, 'scans'), {
-      email: user.email,
-      data,
-      type,
-      scannedAt: serverTimestamp(),
-    });
-  }
-}
+  const docRef = await addDoc(collection(db, 'scans'), {
+    email: user.email,
+    data,
+    type,
+    scannedAt: serverTimestamp(),
+  });
+  return docRef.id; // Return the document ID
+};
 
 const ScannerScreen = ({ navigation }) => {
   const [hasPermission, setHasPermission] = useState(null);
   const [scanned, setScanned] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
+  const [isFocused, setIsFocused] = useState(true);
   const cameraRef = useRef(null);
 
   useEffect(() => {
@@ -33,33 +33,42 @@ const ScannerScreen = ({ navigation }) => {
     })();
   }, []);
 
+  // Reset scanned state when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('Screen focused - resetting scanner state');
+      setIsFocused(true);
+      setScanned(false);
+      
+      return () => {
+        console.log('Screen unfocused');
+        setIsFocused(false);
+      };
+    }, [])
+  );
+
   const handleBarCodeScanned = async ({ type, data }) => {
-    if (scanned) return;
+    if (scanned || !isFocused) return;
 
     setScanned(true);
 
-    // Save to Firestore
     try {
-      await saveScanToFirestore(data, type);
+      const scanId = await saveScanToFirestore(data, type);
+      // Navigate to ScanDetailScreen with scan data
+      navigation.navigate('ScanDetail', {
+        scanId,
+        scanData: { data, type, scannedAt: new Date() }, // Use current time as a fallback
+      });
     } catch (error) {
       Alert.alert('Error', error.message);
+      setScanned(false);
     }
-    Alert.alert('QR Code Scanned', data, [
-      {
-        text: 'Scan Again',
-        onPress: () => setScanned(false),
-      },
-      {
-        text: 'OK',
-        onPress: () => navigation.goBack(),
-      },
-    ]);
   };
 
   if (hasPermission === null) {
     return (
       <View style={styles.center}>
-        <Text>Requesting camera permission...</Text>
+        <Text>Requesting permissions...</Text>
       </View>
     );
   }
@@ -74,24 +83,23 @@ const ScannerScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <CameraView
-        ref={cameraRef}
-        style={StyleSheet.absoluteFillObject}
-        onBarcodeScanned={handleBarCodeScanned}
-        barcodeScannerSettings={{
-          barcodeTypes: ['qr'],
-        }}
-        facing="back"
-        torch={torchOn ? 'on' : 'off'}
-      />
-
-      {/* Overlay Frame */}
+      {isFocused && (
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFillObject}
+          onBarcodeScanned={handleBarCodeScanned}
+          barcodeScannerSettings={{
+            barcodeTypes: ['qr'],
+          }}
+          facing="back"
+          torch={torchOn ? 'on' : 'off'}
+        />
+      )}
       <View style={styles.overlay}>
         <View style={styles.frame}>
           <Text style={styles.scanningText}>Align QR code within the frame</Text>
         </View>
       </View>
-
     </View>
   );
 };
@@ -124,14 +132,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
-  },
-  bottomControls: {
-    position: 'absolute',
-    bottom: 40,
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
   },
 });
 
