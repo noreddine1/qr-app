@@ -7,9 +7,9 @@ import {
   Linking, 
   Alert,
   Share,
-  Clipboard,
   ScrollView
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { format, isToday, isYesterday } from 'date-fns';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -90,13 +90,14 @@ const ScanDetail = ({ scan, navigation }) => {
 
   const typeInfo = getQRTypeInfo(scan.data, scan.type);
 
-  // Handle copying to clipboard
+  // Handle copying to clipboard - Updated to use Expo Clipboard
   const handleCopy = async () => {
     try {
       await Clipboard.setStringAsync(scan.data);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
+      console.error('Copy error:', error);
       Alert.alert('Error', 'Failed to copy to clipboard');
     }
   };
@@ -109,6 +110,7 @@ const ScanDetail = ({ scan, navigation }) => {
         title: 'QR Code Data',
       });
     } catch (error) {
+      console.error('Share error:', error);
       Alert.alert('Error', 'Failed to share content');
     }
   };
@@ -274,27 +276,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
-  },
-  backButton: {
-    padding: 8,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-  },
-  placeholder: {
-    width: 40,
   },
   typeCard: {
     flexDirection: 'row',
