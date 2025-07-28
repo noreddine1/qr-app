@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { auth } from '../firebase/config';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const LoginScreen = ({ navigation }) => {
   const isDev = __DEV__; // Expo sets this to true in dev mode
@@ -10,99 +11,160 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState(isDev ? '123456' : '');
   const [confirmPassword, setConfirmPassword] = useState(isDev ? '123456' : '');
   const [isSignUp, setIsSignUp] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
 
-  const handleAuthenticate = async () => {
+  const validateForm = () => {
+    const newErrors = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (!email || !password) {
-      return Alert.alert('Error', 'Email and password are required.');
+    if (!email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!emailRegex.test(email)) {
+      newErrors.email = 'Please enter a valid email address';
     }
 
-    if (!emailRegex.test(email)) {
-      return Alert.alert('Error', 'Please enter a valid email address.');
+    if (!password) {
+      newErrors.password = 'Password is required';
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
     }
 
-    if (password.length < 6) {
-      return Alert.alert('Error', 'Password must be at least 6 characters.');
-    }
     if (isSignUp && password !== confirmPassword) {
-      return Alert.alert('Error', 'Passwords do not match.');
+      newErrors.confirmPassword = 'Passwords do not match';
     }
-    // authentication logic 
-    if (isSignUp) {
-      try {
-        await createUserWithEmailAndPassword(auth, email, password);
-        navigation.navigate('Home');
-      } catch (error) {
-        return Alert.alert('Error', error.message);
-      }
-      Alert.alert('Success', 'You have successfully signed up!');
-    } else {
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-        navigation.navigate('Home');
-      } catch (error) {
-        return Alert.alert('Error', error.message);
-      }
-      Alert.alert('Success', 'You have successfully logged in!');
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleAuthenticate = async () => {
+    if (!validateForm()) {
+      return;
     }
-    resetForm();
+
+    setLoading(true);
+    setErrors({});
+
+    try {
+      if (isSignUp) {
+        await createUserWithEmailAndPassword(auth, email.trim(), password);
+        navigation.navigate('Home');
+      } else {
+        await signInWithEmailAndPassword(auth, email.trim(), password);
+        navigation.navigate('Home');
+      }
+    } catch (error) {
+      console.error('Authentication error:', error);
+
+      // Handle Firebase authentication errors
+      let errorMessage = 'An unexpected error occurred. Please try again.';
+      switch (error.code) {
+        case 'auth/invalid-credential':
+          errorMessage = 'Invalid credentials. Please check your email and password.';
+          break;
+        case 'auth/email-already-in-use':
+          errorMessage = 'An account with this email already exists.';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'Network error. Please check your connection.';
+          break;
+      }
+
+      setErrors({ global: errorMessage });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const resetForm = () => {
     setEmail('');
     setPassword('');
     setConfirmPassword('');
+    setErrors({});
   };
 
   const handleToggleMode = () => {
     setIsSignUp(!isSignUp);
-    if (isDev) { //just for development convenience
-      resetForm();
-    }
+    resetForm();
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>QR Code Scanner</Text>
       <Text style={styles.subtitle}>{isSignUp ? 'Sign Up' : 'Login'}</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        autoCapitalize="none"
-      />
-      {isSignUp && (
+
+      <View style={styles.inputContainer}>
+        <MaterialIcons name="email" size={24} color="#007AFF" />
         <TextInput
-          style={styles.input}
-          placeholder="Confirm Password"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry
-          autoCapitalize="none"
-        />
-      )}
-      <View style={styles.buttonContainer}>
-        <Button
-          title={isSignUp ? 'Sign Up' : 'Login'}
-          onPress={() => {
-            handleAuthenticate();
+          style={[styles.input, errors.email && styles.inputError]}
+          placeholder="Email"
+          value={email}
+          onChangeText={(text) => {
+            setEmail(text);
+            if (errors.email) setErrors((prev) => ({ ...prev, email: null }));
           }}
-          color="#007AFF"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          editable={!loading}
         />
       </View>
-      <TouchableOpacity onPress={handleToggleMode}>
-        <Text style={styles.toggleText}>
+      {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+
+      <View style={styles.inputContainer}>
+        <MaterialIcons name="lock" size={24} color="#007AFF" />
+        <TextInput
+          style={[styles.input, errors.password && styles.inputError]}
+          placeholder="Password"
+          value={password}
+          onChangeText={(text) => {
+            setPassword(text);
+            if (errors.password) setErrors((prev) => ({ ...prev, password: null }));
+          }}
+          secureTextEntry
+          autoCapitalize="none"
+          editable={!loading}
+        />
+      </View>
+      {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+
+      {isSignUp && (
+        <>
+          <View style={styles.inputContainer}>
+            <MaterialIcons name="lock" size={24} color="#007AFF" />
+            <TextInput
+              style={[styles.input, errors.confirmPassword && styles.inputError]}
+              placeholder="Confirm Password"
+              value={confirmPassword}
+              onChangeText={(text) => {
+                setConfirmPassword(text);
+                if (errors.confirmPassword) setErrors((prev) => ({ ...prev, confirmPassword: null }));
+              }}
+              secureTextEntry
+              autoCapitalize="none"
+              editable={!loading}
+            />
+          </View>
+          {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
+        </>
+      )}
+
+      {errors.global && <Text style={styles.globalErrorText}>{errors.global}</Text>}
+
+      <TouchableOpacity
+        style={[styles.button, loading && styles.disabledButton]}
+        onPress={handleAuthenticate}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>{isSignUp ? 'Sign Up' : 'Login'}</Text>
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={handleToggleMode} disabled={loading}>
+        <Text style={[styles.toggleText, loading && styles.disabledText]}>
           {isSignUp ? 'Already have an account? Login' : 'Need an account? Sign Up'}
         </Text>
       </TouchableOpacity>
@@ -128,23 +190,60 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 30,
   },
-  input: {
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     width: '100%',
     padding: 10,
-    marginVertical: 10,
+    marginVertical: 5,
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 5,
     backgroundColor: '#fff',
   },
-  buttonContainer: {
+  input: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  inputError: {
+    borderColor: '#FF3B30',
+    borderWidth: 2,
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 14,
+    marginTop: 2,
+    marginLeft: 5,
+  },
+  globalErrorText: {
+    color: '#FF3B30',
+    fontSize: 16,
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  button: {
     width: '100%',
+    padding: 15,
     marginTop: 20,
+    backgroundColor: '#007AFF',
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
   },
   toggleText: {
     marginTop: 20,
     color: '#007AFF',
     fontSize: 16,
+  },
+  disabledText: {
+    color: '#999',
   },
 });
 
