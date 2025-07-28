@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { CameraView, Camera } from 'expo-camera';
 import { useFocusEffect } from '@react-navigation/native';
 import { auth, db } from '../firebase/config';
@@ -22,6 +22,7 @@ const saveScanToFirestore = async (data, type) => {
 const ScannerScreen = ({ navigation }) => {
   const [hasPermission, setHasPermission] = useState(null);
   const [scanned, setScanned] = useState(false);
+  const [loading, setLoading] = useState(false); 
   const [torchOn, setTorchOn] = useState(false);
   const [isFocused, setIsFocused] = useState(true);
   const cameraRef = useRef(null);
@@ -53,15 +54,42 @@ const ScannerScreen = ({ navigation }) => {
     setScanned(true);
 
     try {
+      // Add loading state
+      setLoading(true);
+      
       const scanId = await saveScanToFirestore(data, type);
-      // Navigate to ScanDetailScreen with scan data
-      navigation.navigate('ScanDetail', {
-        scanId,
-        scanData: { data, type, scannedAt: new Date() }, // Use current time as a fallback
-      });
+      
+      // Add success feedback
+      Alert.alert('Success', 'QR code scanned successfully!', [
+        {
+          text: 'View Details',
+          onPress: () => navigation.navigate('ScanDetail', {
+            scanId,
+            scanData: { data, type, scannedAt: new Date() },
+          }),
+        },
+        {
+          text: 'Scan Another',
+          onPress: () => setScanned(false),
+        },
+      ]);
     } catch (error) {
-      Alert.alert('Error', error.message);
-      setScanned(false);
+      console.error('Scan error:', error);
+      
+      // More specific error messages
+      let errorMessage = 'Failed to save scan. Please try again.';
+      if (error.code === 'permission-denied') {
+        errorMessage = 'You do not have permission to save scans.';
+      } else if (error.code === 'network-request-failed') {
+        errorMessage = 'Network error. Check your connection.';
+      }
+      
+      Alert.alert('Error', errorMessage, [
+        { text: 'Retry', onPress: () => setScanned(false) },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -97,7 +125,10 @@ const ScannerScreen = ({ navigation }) => {
       )}
       <View style={styles.overlay}>
         <View style={styles.frame}>
-          <Text style={styles.scanningText}>Align QR code within the frame</Text>
+          <Text style={styles.scanningText}>
+            {loading ? 'Processing...' : 'Align QR code within the frame'}
+          </Text>
+          {loading && <ActivityIndicator size="large" color="#00FF00" />}
         </View>
       </View>
     </View>
