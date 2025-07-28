@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { CameraView, Camera } from 'expo-camera';
 import { useFocusEffect } from '@react-navigation/native';
 import { auth, db } from '../firebase/config';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 
 const saveScanToFirestore = async (data, type) => {
   const user = auth.currentUser;
@@ -65,7 +65,12 @@ const ScannerScreen = ({ navigation }) => {
           text: 'View Details',
           onPress: () => navigation.navigate('ScanDetail', {
             scanId,
-            scanData: { data, type, scannedAt: new Date() },
+            // Fix: Pass a proper Firestore Timestamp instead of Date
+            scanData: { 
+              data, 
+              type, 
+              scannedAt: Timestamp.fromDate(new Date()) // Convert Date to Firestore Timestamp
+            },
           }),
         },
         {

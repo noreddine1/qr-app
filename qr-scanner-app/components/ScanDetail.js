@@ -35,11 +35,30 @@ const ScanDetail = ({ scan, navigation }) => {
     );
   }
 
-  // Enhanced date formatting
+  // Enhanced date formatting with null safety
   const formatScanDate = (timestamp) => {
     if (!timestamp) return 'Unknown';
     
-    const date = timestamp.toDate();
+    let date;
+    
+    // Handle both Firestore Timestamp and JavaScript Date objects
+    if (timestamp && typeof timestamp.toDate === 'function') {
+      // Firestore Timestamp
+      date = timestamp.toDate();
+    } else if (timestamp instanceof Date) {
+      // JavaScript Date
+      date = timestamp;
+    } else if (typeof timestamp === 'string') {
+      // String date
+      date = new Date(timestamp);
+    } else {
+      return 'Unknown';
+    }
+    
+    // Validate the date
+    if (isNaN(date.getTime())) {
+      return 'Invalid Date';
+    }
     
     if (isToday(date)) {
       return `Today at ${format(date, 'h:mm a')}`;
@@ -107,11 +126,7 @@ const ScanDetail = ({ scan, navigation }) => {
       } else if (typeInfo.icon === 'message') {
         await Linking.openURL(scan.data);
       } else if (typeInfo.icon === 'location-on') {
-        if (scan.data.startsWith('geo:')) {
-          await Linking.openURL(scan.data);
-        } else {
-          await Linking.openURL(scan.data);
-        }
+        await Linking.openURL(scan.data);
       }
     } catch (error) {
       Alert.alert('Error', 'Unable to open this content');
@@ -202,7 +217,7 @@ const ScanDetail = ({ scan, navigation }) => {
           <View style={styles.metadataContent}>
             <Text style={styles.metadataLabel}>QR Code Type</Text>
             <Text style={styles.metadataValue}>
-              {scan.type.replace('org.iso.', '').toUpperCase()}
+              {scan.type ? scan.type.replace('org.iso.', '').toUpperCase() : 'Unknown'}
             </Text>
           </View>
         </View>
@@ -212,7 +227,7 @@ const ScanDetail = ({ scan, navigation }) => {
           <View style={styles.metadataContent}>
             <Text style={styles.metadataLabel}>Content Length</Text>
             <Text style={styles.metadataValue}>
-              {scan.data.length} characters
+              {scan.data ? scan.data.length : 0} characters
             </Text>
           </View>
         </View>
