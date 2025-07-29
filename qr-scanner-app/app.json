@@ -20,13 +20,16 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.nmaazouz.qrscannerapp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
-      "expo-barcode-scanner"
-    ]
+    "extra": {
+      "eas": {
+        "projectId": "257bc2f4-9db7-4a03-8740-c81c9bfec8b8"
+      }
+    }
   }
 }
